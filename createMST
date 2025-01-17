@@ -49,7 +49,7 @@ source_coords = [source_RA.astype(str) + ' ' + source_Dec.astype(str)]
 
 c = []
 for i in range(0, nSources):
-    c.append(SkyCoord(source_coords[0][i], frame='fk5', unit=(u.deg, u.deg), obstime="J2000"))
+    c.append(SkyCoord(source_coords[0][i], frame='fk5', unit=(u.hourangle, u.deg), obstime="J2000"))
 
 # Convert coordinates to degrees for usage in the MST package
 #
@@ -72,10 +72,9 @@ sramin=274.5472
 sdemax=-16.95311388888889
 sdemin=-16.966324999999998
 control=1
-#x_list[i] <=  nramax and x_list[i]>= nramin and y_list[i] <= ndemax and y_list[i]>=ndemin
 if control == 1:
     for i in range(len(x_list)):
-        if control==1:
+        if x_list[i] <=  nramax and x_list[i]>= nramin and y_list[i] <= ndemax and y_list[i]>=ndemin:
             xp.append(x_list[i])
             yp.append(y_list[i])
 elif control == 0:
