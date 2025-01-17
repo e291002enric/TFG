@@ -1,0 +1,213 @@
+#
+# Python script to generate Minimum Spanning Tree for a set
+# of astronomical objects distributed in the plane of the sky
+#
+# Information on the MiSTree package can be found here:
+# https://knaidoo29.github.io/mistreedoc/minimum_spanning_tree.html
+#
+# v 2023.05 (Alvaro Sanchez-Monge)
+#
+
+# Load python functions and packages
+#
+from __future__ import print_function
+import numpy as np
+import matplotlib.pylab as plt
+import mistree as mist
+import astropy.units as u
+from astropy.coordinates import SkyCoord
+import pandas as pd
+
+#-----------------------------------------------------------------------
+#
+# USER-define parameters
+#
+# File containing information of the astronomical sources
+# Current version: three columns separated with ; symbol
+#  - 1st column: Name of source
+#  - 2nd column: Right Ascension (in h:m:s)
+#  - 3rd column: Declination (in h:m:s)
+#
+sources_filename = '2.csv'
+
+#-----------------------------------------------------------------------
+
+#-----------------------------------------------------------------------
+#
+# MAIN functions start here
+#
+
+# Load file containing sources coordinates
+#
+df = pd.read_csv(sources_filename, sep=';', usecols=[0,1,2], header=None, index_col=False)
+
+source_Name = df[0]
+source_RA = df[1]
+source_Dec = df[2]
+nSources = len(source_RA)
+source_coords = [source_RA.astype(str) + ' ' + source_Dec.astype(str)]
+
+c = []
+for i in range(0, nSources):
+    c.append(SkyCoord(source_coords[0][i], frame='fk5', unit=(u.deg, u.deg), obstime="J2000"))
+
+# Convert coordinates to degrees for usage in the MST package
+#
+x_list = []
+y_list = []
+for i in range(0, nSources):
+    x_list.append(c[i].ra.degree)
+    y_list.append(c[i].dec.degree)
+xp=[]
+yp=[]
+
+
+#Camp comú
+nramax=274.55544999999995
+nramin=274.5478833333333
+ndemax=-16.82250833333333
+ndemin=-16.83826111111111
+sramax=274.5606666666667
+sramin=274.5472
+sdemax=-16.95311388888889
+sdemin=-16.966324999999998
+control=1
+#x_list[i] <=  nramax and x_list[i]>= nramin and y_list[i] <= ndemax and y_list[i]>=ndemin
+if control == 1:
+    for i in range(len(x_list)):
+        if control==1:
+            xp.append(x_list[i])
+            yp.append(y_list[i])
+elif control == 0:
+    for i in range(len(x_list)):
+        if x_list[i] <=  sramax and x_list[i] >= sramin and y_list[i] <= sdemax and y_list[i]>=sdemin:
+            xp.append(x_list[i])
+            yp.append(y_list[i])
+x=np.asarray(xp)
+y=np.asarray(yp)
+nSources=len(x)
+
+print(len(x))
+print(len(y))
+# Run MST functions to generate it
+#
+mst = mist.GetMST(x=x, y=y)
+
+# Get statistics of the MST
+#
+d, l, b, s, l_index, b_index = mst.get_stats(include_index=True)
+
+
+# Print segments properties
+#
+print("Median length of segments in the MST is " + str(np.median(l)*3600.) + " arcsec")
+print("Mean length of segments in the MST is " + str(np.mean(l)*3600.) + " arcsec")
+print("Standard deviation of the lengths of segments is " + str(np.std(l)*3600.) + " arcsec")
+print("Minimum length of a segment is " + str(np.min(l)*3600.) + " arcsec")
+print("Maximum length of a segment is " + str(np.max(l)*3600.) + " arcsec")
+
+
+centrex=0
+centrey=0
+for i in range(len(x)):
+    centrex+=x[i]
+    centrey+=y[i]
+centrex=centrex/len(x)
+centrey=centrey/len(x)
+
+dist=[]
+
+for i in range(len(x)):
+    dist.append(((centrex-x[i])**2+(centrey-y[i])**2)**(1/2))
+
+#Distribucio
+Radi=np.max(dist)
+des=Radi/10
+g=[]
+s = np.empty(20)
+separacio=[]
+for i in range(len(x)):
+    for j in range(i + 1, len(x)):  
+        distance = np.sqrt((x[i] - x[j])**2 + (y[i] - y[j])**2)
+        separacio.append(distance)
+
+separacio = np.array(separacio)
+
+threshold_ranges = [(i*des, (i+1)*des) for i in range(20)]
+
+counts = []
+for lower, upper in threshold_ranges:
+    count = ((separacio > lower) & (separacio <= upper)).sum()
+    counts.append((2*count)/(len(x)*(len(x)-1)))
+print ("Delta s = " + str(des))
+
+
+rang=[(i/10) for i in range(20)]
+xx=[(i) for i in range(19)]
+yy=[(i+1) for i in range(19)]
+xx=np.asarray(xx)
+yy=np.asarray(yy)
+
+#Q
+index_u = l_index[0]
+index_v = l_index[1]
+
+Ltot =0
+
+for i in range(len(index_u)):
+    suma=((x[index_u[i]] - x[index_v[i]])**2 + (y[index_u[i]] - y[index_v[i]])**2)**(1/2)
+    Ltot+=suma
+
+
+
+
+pi=3.141592653589793
+a=pi*np.max(dist)**2
+print ("R = "+str(np.max(dist)))
+m=Ltot/((len(x)*a)**(1/2))
+smean=0
+for i in range(len(separacio)):
+    smean += separacio[i]
+smean=smean/(len(separacio)*np.max(dist))
+#retornem q
+q=m/smean
+print(m)
+
+print("El valor de Q és "+ str(q))
+
+plt.figure(figsize=(7., 7.))
+plt.scatter(rang, counts, s=10, color='r')
+for i in range (len(xx)):
+    plt.plot([rang[xx[i]], rang[yy[i]]],
+    [counts[xx[i]], counts[yy[i]]],
+    color='k')
+plt.xlabel(r'$s$ Normalized', size=16)
+plt.ylabel(r'$ρ(s)$ Normalized ', size=16)
+# Plot MST on the sky
+#
+plt.figure(figsize=(7., 7.))
+# plotting nodes:
+plt.scatter(x, y, s=10, color='r')
+plt.scatter(centrex, centrey, s=10,marker='x', color='black')
+# plotting MST edges:
+plt.plot([x[l_index[0]], x[l_index[1]]],
+    [y[l_index[0]], y[l_index[1]]],
+    color='k')
+plt.xlim(np.min(x)-0.1*(np.max(x)-np.min(x)), np.max(x)+0.1*(np.max(x)-np.min(x)))
+plt.ylim(np.min(y)-0.1*(np.max(y)-np.min(y)), np.max(y)+0.1*(np.max(y)-np.min(y)))
+plt.xlabel(r'$R.A.(degrees)$', size=16)
+plt.ylabel(r'$Dec.(degrees)$', size=16)
+plt.tight_layout()
+plt.savefig('MST.png')
+
+# Plot histogram of edge's lengths
+#
+# begins by binning the data and storing this in a dictionary.
+hmst = mist.HistMST()
+hmst.setup()
+mst_dict = hmst.get_hist(d, l, b, s)
+
+# plotting which takes as input the dictionary created before.
+pmst = mist.PlotHistMST()
+pmst.read_mst(mst_dict)
+pmst.plot(saveas='MST_histograms.png')
